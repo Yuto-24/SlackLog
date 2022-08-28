@@ -152,7 +152,6 @@ var SlackAccessor = (function () {
       params = {};
     }
     var url = "https://slack.com/api/" + path + "?";
-    // var qparams = [("token=" + encodeURIComponent(this.APIToken))];
     var qparams = [];
     for (var k in params) {
       qparams.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
@@ -164,9 +163,11 @@ var SlackAccessor = (function () {
     console.log("==> GET " + url);
 
     var options = {
-      headers: headers, // 上で作成されたアクセストークンを含むヘッダ情報が入ります
+      // 上で作成されたアクセストークンを含むヘッダ情報が入ります
+      headers: headers,
     };
-    var response = UrlFetchApp.fetch(url,
+    var response = UrlFetchApp.fetch(
+      url,
       options
     );
     var data = JSON.parse(response.getContentText());
@@ -202,7 +203,8 @@ var SlackAccessor = (function () {
     var option = {
       types: "public_channel, private_channel",
     }; // プライベートチャンネルも対象に入れる
-    var response = this.requestAPI("conversations.list",
+    var response = this.requestAPI(
+      "conversations.list",
       option
     );
     response.channels.forEach(function (channel) {
@@ -228,7 +230,8 @@ var SlackAccessor = (function () {
       if (oldest) {
         options["oldest"] = oldest;
       }
-      var response = _this.requestAPI("conversations.history",
+      var response = _this.requestAPI(
+        "conversations.history",
         options
       );
       messages = response.messages.concat(messages);
@@ -251,20 +254,20 @@ var SlackAccessor = (function () {
     var all_messages = [];
     let _this = this;
 
-    var loadThreadHistory = function (options,
-      oldest) {
+    var loadThreadHistory = function (options, oldest) {
       if (oldest) {
         options["oldest"] = oldest;
       }
       Utilities.sleep(1250);
-      var response = _this.requestAPI("conversations.replies",
-        options);
-
+      var response = _this.requestAPI(
+        "conversations.replies",
+        options
+      );
       return response;
     };
     ts_array = ts_array.reverse();
 
-    ts_array.forEach((ts) => {
+    ts_array.forEach(ts => {
       if (oldest === void 0) {
         oldest = "1";
       }
