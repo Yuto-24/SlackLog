@@ -162,8 +162,8 @@ var SlackAccessor = (function () {
     };
     console.log("==> GET " + url);
 
+    // 上で作成されたアクセストークンを含むヘッダ情報が入ります
     var options = {
-      // 上で作成されたアクセストークンを含むヘッダ情報が入ります
       headers: headers,
     };
     var response = UrlFetchApp.fetch(
@@ -201,8 +201,9 @@ var SlackAccessor = (function () {
   // チャンネル情報取得
   p.requestChannelInfo = function () {
     var option = {
+      // プライベートチャンネルも対象に入れる
       types: "public_channel, private_channel",
-    }; // プライベートチャンネルも対象に入れる
+    };
     var response = this.requestAPI(
       "conversations.list",
       option

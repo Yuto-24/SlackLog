@@ -13,3 +13,4 @@ node_modules/
 
 # Include slack token
 SetProperties*
+*Test*
