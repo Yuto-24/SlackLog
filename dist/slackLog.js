@@ -1,21 +1,27 @@
-function Run() {
-  SetProperties();
+// 初期設定
+function SetProperties() {
+  slack_api_token_array = {};
+  PropertiesService.getScriptProperties().setProperty('slack_api_token', 'xoxp-ここにトークンをコピペ');
+  PropertiesService.getScriptProperties().setProperty("folder_id", "ここにフォルダIDをコピペ");
+  PropertiesService.getScriptProperties().setProperty("last_channel_no", -1);
+}
 
+function Run(API_TOKEN) {
   // フォルダIDおよびAPIトークンを取得
-  const FOLDER_ID = PropertiesService.getScriptProperties().getProperty("folder_id");
-  if (!FOLDER_ID) {
-    throw 'You should set "folder_id" property from [File] > [Project properties] > [Script properties]';
-  }
   const API_TOKEN = PropertiesService.getScriptProperties().getProperty("slack_api_token");
   if (!API_TOKEN) {
     throw 'You should set "slack_api_token" property from [File] > [Project properties] > [Script properties]';
+  }
+  const FOLDER_ID = PropertiesService.getScriptProperties().getProperty("folder_id");
+  if (!FOLDER_ID) {
+    throw 'You should set "folder_id" property from [File] > [Project properties] > [Script properties]';
   }
 
   const token = API_TOKEN;
   let slack = new SlackAccessor(API_TOKEN);
 
   const FOLDER_NAME = slack.requestTeamName(); // チーム情報取得してフォルダ名に設定
-  const SpreadSheetName = "Slack_Log"; // スプレッドシート名の編集
+  const SpreadSheetName = "Slack_Log_" + FOLDER_NAME; // スプレッドシート名の編集
 
   let folder = FindOrCreateFolder(DriveApp.getFolderById(FOLDER_ID), FOLDER_NAME);
   let ss = FindOrCreateSpreadsheet(folder, SpreadSheetName);
@@ -30,22 +36,29 @@ function Run() {
   let first_exec_in_this_channel = false;
   for (let ch of channelInfo) {
     console.log(ch.name);
+    // 最後に記入されたタイムスタンプを取得
     let timestamp = ssCtrl.getLastTimestamp(ch, 0);
+    // 古い順に並んだメッセージ履歴一覧を取得
     let messages = slack.requestMessages(ch, timestamp);
+    // メッセージをスプレッドシートに追加
     ssCtrl.saveChannelHistory(ch, messages, memberList, token);
     if (timestamp == "1") {
       first_exec_in_this_channel = true;
-      // console.log('breaked')
-      // break;
     }
   }
 
   // スレッドは重い処理なので各回に1回のみ行う
-  const ch_num = (parseInt(PropertiesService.getScriptProperties().getProperty("last_channel_no")) + 1) % channelInfo.length;
-  console.log("ch_num");
-  console.log(ch_num);
+  // last_channel_no に 1 を追加して，総チャンネル数の剰余を取得
+  const ch_num = (
+    parseInt( // 数値に変換
+      PropertiesService.getScriptProperties().getProperty("last_channel_no") // last_channel_noを取得
+    ) + 1
+  ) % channelInfo.length;
+  console.log("ch_num: " + ch_num);
+  // ch にはch_num番目の全チャンネル情報を入れる
   const ch = channelInfo[ch_num];
   console.log(ch);
+
   // スプレッドシートの最後(初めての書き込みのときは0にする)
   let timestamp;
   // スレッド元が1か月前の投稿から現在まで(初めての書き込みのときは全てを対象)
@@ -141,10 +154,10 @@ var SlackAccessor = (function () {
     this.APIToken = apiToken;
   }
 
+  var p = SlackAccessor.prototype;
+  // 取り込み最大量(1000件 x 10ページ)
   var MAX_HISTORY_PAGINATION = 10;
   var HISTORY_COUNT_PER_PAGE = 1000;
-
-  var p = SlackAccessor.prototype;
 
   // API リクエスト
   p.requestAPI = function (path, params) {
@@ -152,6 +165,7 @@ var SlackAccessor = (function () {
       params = {};
     }
     var url = "https://slack.com/api/" + path + "?";
+    // エンコードされたオプションを格納
     var qparams = [];
     for (var k in params) {
       qparams.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
@@ -179,9 +193,11 @@ var SlackAccessor = (function () {
     return data;
   };
 
-  // チーム情報取得
+  // チーム名取得
   p.requestTeamName = function () {
+    // response に api から返ってきたデータを格納
     var response = this.requestAPI("team.info");
+    // teamName にteam.nameパラメータを格納
     var teamName = response.team.name;
     console.log("Team Name = " + response.team.name);
     return teamName;
@@ -192,8 +208,7 @@ var SlackAccessor = (function () {
     var response = this.requestAPI("users.list");
     var memberNames = {};
     response.members.forEach(function (member) {
-      memberNames[member.id] = member.name;
-      console.log("memberNames[" + member.id + "] = " + member.name);
+      memberNames[member.id] = member.real_name;
     });
     return memberNames;
   };
@@ -216,6 +231,7 @@ var SlackAccessor = (function () {
 
   // 特定チャンネルのメッセージ取得
   p.requestMessages = function (channel, oldest) {
+    // oldest には最も古いメッセージのtsを入れる
     var _this = this;
     if (oldest === void 0) {
       oldest = "1";
@@ -235,13 +251,20 @@ var SlackAccessor = (function () {
         "conversations.history",
         options
       );
+      // messagesは配列
+      // それぞれの要素は，各メッセージ履歴のデータ
       messages = response.messages.concat(messages);
+      // 返り値は加工をしない全データ
       return response;
     };
 
     var resp = loadChannelHistory();
     var page = 1;
+    // responseにはfalseの場合のみhas_moreの要素がある
+    // slackApiの読み取り上限値がMAX_HISTORY_PAGINATION
     while (resp.has_more && page <= MAX_HISTORY_PAGINATION) {
+      // resp.messages[0].ts は読み取った1000件の内，最も新しいメッセージのts
+      // 要するに，新しいメッセージが頭にある
       resp = loadChannelHistory(resp.messages[0].ts);
       page++;
     }
@@ -255,6 +278,7 @@ var SlackAccessor = (function () {
     var all_messages = [];
     let _this = this;
 
+    // スレッド取得の定義
     var loadThreadHistory = function (options, oldest) {
       if (oldest) {
         options["oldest"] = oldest;
@@ -267,6 +291,7 @@ var SlackAccessor = (function () {
       return response;
     };
     ts_array = ts_array.reverse();
+
 
     ts_array.forEach(ts => {
       if (oldest === void 0) {
@@ -309,18 +334,21 @@ var SpreadsheetController = (function () {
   const COL_DATE = 1; // 日付・時間(タイムスタンプから読みやすい形式にしたもの)
   const COL_USER = 2; // ユーザ名
   const COL_TEXT = 3; // テキスト内容
-  const COL_URL = 4; // URL
-  const COL_LINK = 5; // ダウンロードファイルリンク
-  const COL_TIME = 6; // 差分取得用に使用するタイムスタンプ
-  const COL_REPLY_COUNT = 7; // スレッド内の投稿数
-  const COL_IS_REPLY = 8; // リプライのとき1，そうでないとき0
-  const COL_JSON = 9; // 念の為取得した JSON をまるごと記述しておく列
+  const COL_LINK = 4; // ダウンロードファイルリンク
+  const COL_URL = 5; // alternate URL
+  const COL_TIME_INT = 6; // 差分取得用に使用するタイムスタンプ
+  const COL_TIME_DOUBLE = 7; // 差分取得用に使用するタイムスタンプ
+  const COL_REPLY_COUNT = 8; // スレッド内の投稿数
+  const COL_IS_REPLY = 9; // リプライのとき1，そうでないとき0
+  const COL_JSON = 10; // 念の為取得した JSON をまるごと記述しておく列
 
   const COL_MAX = COL_JSON; // COL 最大値
 
   const COL_WIDTH_DATE = 130;
   const COL_WIDTH_TEXT = 800;
-  const COL_WIDTH_URL = 400;
+  const COL_WIDTH_URL = 80;
+  const COL_TIME = 50;
+  const COL_NUM = 20;
 
   var p = SpreadsheetController.prototype;
 
@@ -342,6 +370,11 @@ var SpreadsheetController = (function () {
       sheet.setColumnWidth(COL_DATE, COL_WIDTH_DATE);
       sheet.setColumnWidth(COL_TEXT, COL_WIDTH_TEXT);
       sheet.setColumnWidth(COL_URL, COL_WIDTH_URL);
+      sheet.setColumnWidth(COL_LINK, COL_WIDTH_URL);
+      sheet.setColumnWidth(COL_TIME_INT, COL_TIME);
+      sheet.setColumnWidth(COL_TIME_DOUBLE, COL_TIME);
+      sheet.setColumnWidth(COL_REPLY_COUNT, COL_NUM);
+      sheet.setColumnWidth(COL_IS_REPLY, COL_NUM);
     }
     return sheet;
   };
@@ -360,7 +393,8 @@ var SpreadsheetController = (function () {
     var sheet = this.getChannelSheet(channel);
     var lastRow = sheet.getLastRow();
     var lastCol = sheet.getLastColumn();
-    sheet.getRange(1, 1, lastRow, lastCol).sort(COL_TIME);
+    sheet.getRange(1, 1, lastRow, lastCol).sort(COL_TIME_DOUBLE);
+    sheet.getRange(1, 1, lastRow, lastCol).sort(COL_TIME_INT);
   };
 
   // 最後に記録したタイムスタンプ取得
@@ -379,8 +413,11 @@ var SpreadsheetController = (function () {
         return "1";
       }
       console.log("last timestamp row: " + row_of_last_update);
-      console.log("last timestamp: " + sheet.getRange(row_of_last_update, COL_TIME).getValue());
-      return sheet.getRange(row_of_last_update, COL_TIME).getValue();
+      console.log("last timestamp: " + sheet.getRange(row_of_last_update, COL_TIME_INT, COL_TIME_DOUBLE).getValue());
+      let col_int = sheet.getRange(row_of_last_update, COL_TIME_INT).getValue();
+      let col_double = sheet.getRange(row_of_last_update, COL_TIME_DOUBLE).getValue();
+      let col_time = col_int + col_double;
+      return col_time;
     }
     return "1";
   };
@@ -393,7 +430,9 @@ var SpreadsheetController = (function () {
       console.log("lastRow > 0");
       let first_row = 0;
       for (let i = 1; i <= lastRow; i++) {
-        ts = sheet.getRange(i, COL_TIME).getValue();
+        ts_int = sheet.getRange(i, COL_TIME_INT).getValue();
+        ts_double = sheet.getRange(i, COL_TIME_DOUBLE).getValue();
+        ts = ts_int + ts_double;
         if (ts > first_ts) {
           first_row = i;
           break;
@@ -405,8 +444,12 @@ var SpreadsheetController = (function () {
       }
       for (let i = first_row; i <= lastRow; i++) {
         if (!sheet.getRange(i, COL_REPLY_COUNT).isBlank()) {
-          ts = sheet.getRange(i, COL_TIME).getValue();
-          ts_array.push(ts.toFixed(6).toString());
+          // ts = sheet.getRange(i, COL_TIME).getValue();
+          // ts = sheet.getRange(i, COL_TIME).getValue();
+          ts_int = sheet.getRange(i, COL_TIME_INT).getValue();
+          ts_double = sheet.getRange(i, COL_TIME_DOUBLE).getValue();
+          ts = ts_int + ts_double;
+          ts_array.push(parseFloat(ts).toFixed(6).toString());
         }
       }
 
@@ -428,7 +471,6 @@ var SpreadsheetController = (function () {
 
     var sheet = this.getChannelSheet(channel);
     var lastRow = sheet.getLastRow();
-    var currentRow = lastRow + 1;
 
     // チャンネルごとにダウンロードフォルダを用意する
     var downloadFolder = this.getDownloadFolder(channel);
@@ -455,32 +497,63 @@ var SpreadsheetController = (function () {
       );
       row[COL_DATE - 1] = date;
       // ユーザー名
-      row[COL_USER - 1] = memberList[msg.user] || msg.username;
+      // row[COL_USER - 1] = memberList[msg.user] || msg.username;
+      row[COL_USER - 1] = memberList[msg.user];
       // Slack テキスト整形
       row[COL_TEXT - 1] = UnescapeMessageText(msg.text, memberList);
       // アップロードファイル URL とダウンロード先 Drive の Viewer リンク
       var url = "";
       var alternateLink = "";
-      if (msg.upload == true) {
-        url = msg.files[0].url_private_download;
-        console.log("url: " + url);
-        if (msg.files[0].mode == "tombstone" || msg.files[0].mode == "hidden_by_limit") {
-          url = "";
-        } else {
-          // ダウンロードとダウンロード先
-          var file = DownloadData(
-            url,
-            downloadFolder,
-            date,
-            token
-          );
-          var driveFile = DriveApp.getFileById(file.getId());
-          alternateLink = driveFile.alternateLink;
+      if (msg.files && msg.files[0].mimetype) {
+        console.log(msg);
+        if (msg.files[0].mimetype.match(/.*image.*/) || msg.files[0].mimetype.match(/.*pdf.*/)) {
+          url = msg.files[0].url_private_download;
+          console.log("url: " + url);
+
+          // 複数ファイルがある場合の処理
+          // for (let i = 1; ; i++) {
+          //   try {
+          //     if (msg.files[i]) {
+          //       if (msg.files[i].mode != "tombstone" || msg.files[i].mode != "hidden_by_limit") {
+          //         var download_url = msg.files[i].url_private_download;
+          //         console.log("download_url: " + download_url);
+          //         DownloadData(url, downloadFolder, date, token);
+          //       }
+          //     } else {
+          //       break;
+          //     }
+          //   } catch (e) { continue; }
+          // }
+
+          // 最初のファイルをダウンロード
+          if (msg.files[0].mode == "tombstone" || msg.files[0].mode == "hidden_by_limit") {
+            url = "";
+          } else {
+            // ダウンロードとダウンロード先
+            try {
+              var file = DownloadData(
+                url,
+                downloadFolder,
+                date,
+                token
+              );
+              // ダウンロードしたファイルのファイルIDを取得
+              var fileId = file.getId();
+              alternateLink = file.getUrl();
+              console.log("driveFile ID: " + fileId);
+              console.log("alternate link: " + alternateLink);
+            } catch (e) {
+              break;
+            }
+          }
         }
       }
       row[COL_URL - 1] = url;
       row[COL_LINK - 1] = alternateLink;
-      row[COL_TIME - 1] = msg.ts;
+      let ts_int = Math.floor(msg.ts);
+      let ts_double = (msg.ts - ts_int).toPrecision(6);
+      row[COL_TIME_INT - 1] = ts_int;
+      row[COL_TIME_DOUBLE - 1] = ts_double;
       if ("reply_count" in msg) {
         row[COL_REPLY_COUNT - 1] = msg.reply_count;
       }
@@ -502,7 +575,7 @@ var SpreadsheetController = (function () {
         .getRange(lastRow + 1, 1, record.length, COL_MAX);
       range.setValues(record);
     }
-    downloadFolder.setTrashed(true);
+    // downloadFolder.setTrashed(true);
   };
 
   return SpreadsheetController;
