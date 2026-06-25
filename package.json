@@ -27,12 +27,12 @@
 	"devDependencies": {
 		"@types/google-apps-script": "1.0.37",
 		"@types/jest": "26.0.24",
-		"@typescript-eslint/eslint-plugin": "4.29.0",
-		"@typescript-eslint/parser": "4.29.0",
+		"@typescript-eslint/eslint-plugin": "5.62.0",
+		"@typescript-eslint/parser": "5.62.0",
 		"cpx": "1.5.0",
-		"eslint": "7.32.0",
+		"eslint": "8.57.1",
 		"eslint-config-prettier": "8.3.0",
-		"eslint-plugin-prettier": "3.4.0",
+		"eslint-plugin-prettier": "4.2.5",
 		"gas-webpack-plugin": "1.2.3",
 		"jest": "26.5.3",
 		"prettier": "2.3.2",
@@ -56,5 +56,10 @@
 			"json",
 			"node"
 		]
+	},
+	"overrides": {
+		"@istanbuljs/load-nyc-config": {
+			"js-yaml": "4.2.0"
+		}
 	}
 }
