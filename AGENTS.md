@@ -10,3 +10,7 @@
 - Preserve all existing independent-review requirements and actual repository gates. Required latest-commit approval, required checks, unresolved conversations, and effective change requests take precedence over the optimization above. Do not dismiss reviews, weaken protection, or mark unreviewed work as approved to bypass a gate; report any required gate that cannot be verified or satisfied. Merge and deployment still require their existing authorization.
 
 When a repository's documentation and its existing code disagree, follow the conventions used in the existing code, and in your final reply point out each inconsistency you found between the documentation and the code
+
+## Reusable knowledge
+
+Before work, consult [the shared knowledge index](docs/knowledge/INDEX.md) and only the entries relevant to the task; follow [the knowledge workflow](docs/knowledge/README.md) to verify applicability and preserve non-obvious findings with evidence through incremental updates. Keep detailed lessons out of this file, reuse existing canonical documents, and do not create an entry when nothing reusable was learned.
