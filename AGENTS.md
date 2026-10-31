@@ -8,3 +8,9 @@
 - Before any additional request, record its reason, the reviewed commit, current HEAD, remaining findings, and whether automatic review already covers the diff. If a completed automatic review already covers the target diff and no outstanding finding requires another reviewer response, do not request it again; if such a review is queued or running, wait. Do not claim that an older review covers a newer commit without checking and reporting the intervening changes.
 - Respect rate limits and the stated retry time. A quota reset alone is not a reason to re-request; reassess whether review is still necessary. Do not post repeated requests while waiting or change paid plans to obtain more reviews.
 - Preserve all existing independent-review requirements and actual repository gates. Required latest-commit approval, required checks, unresolved conversations, and effective change requests take precedence over the optimization above. Do not dismiss reviews, weaken protection, or mark unreviewed work as approved to bypass a gate; report any required gate that cannot be verified or satisfied. Merge and deployment still require their existing authorization.
+
+When a repository's documentation and its existing code disagree, follow the conventions used in the existing code, and in your final reply point out each inconsistency you found between the documentation and the code
+
+## Reusable knowledge
+
+Before work, consult [the shared knowledge index](docs/knowledge/INDEX.md) and only the entries relevant to the task; follow [the knowledge workflow](docs/knowledge/README.md) to verify applicability and preserve non-obvious findings with evidence through incremental updates. Keep detailed lessons out of this file, reuse existing canonical documents, and do not create an entry when nothing reusable was learned.
